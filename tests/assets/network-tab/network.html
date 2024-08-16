@@ -13,6 +13,9 @@
     </style>
     <script src='script.js'></script>
     <script>fetch('/api/endpoint')</script>
+    <script>
+      fetch('/post-call', { method: 'POST', body: JSON.stringify({ body: { key: 'value' } }) })
+    </script>
   </head>
   <body>
     <h1>Network Tab Test</h1>

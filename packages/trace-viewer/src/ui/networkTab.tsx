@@ -26,6 +26,8 @@ import { GridView, type RenderedGridCell } from '@web/components/gridView';
 import { SplitView } from '@web/components/splitView';
 import type { ContextEntry } from '../entries';
 import { NetworkFilters, defaultFilterState, type FilterState, type ResourceType } from './networkFilters';
+import { ContextMenu, ContextMenuItem, useContextMenu } from './contextMenu';
+import { generateCurlCommand } from './curl';
 
 type NetworkTabModel = {
   resources: Entry[],
@@ -45,7 +47,7 @@ type RenderedEntry = {
   contextId: string,
 };
 type ColumnName = keyof RenderedEntry;
-type Sorting = { by: ColumnName, negate: boolean};
+type Sorting = { by: ColumnName, negate: boolean };
 const NetworkGridView = GridView<RenderedEntry>;
 
 export function useNetworkTabModel(model: MultiTraceModel | undefined, selectedTime: Boundaries | undefined): NetworkTabModel {
@@ -87,13 +89,24 @@ export const NetworkTab: React.FunctionComponent<{
     setSelectedEntry(undefined);
   }, []);
 
+  const contextMenu = useContextMenu<RenderedEntry>();
+
+  const onCopyAsCurl = React.useCallback((entry: RenderedEntry) => async () => {
+    const curlCommand = await generateCurlCommand(entry.resource);
+    await navigator.clipboard.writeText(curlCommand);
+  }, []);
+
+  const onCopyUrl = React.useCallback((entry: RenderedEntry) => async () => {
+    await navigator.clipboard.writeText(entry.resource.request.url);
+  }, []);
+
   if (!networkModel.resources.length)
     return <PlaceholderPanel text='No network calls' />;
 
   const grid = <NetworkGridView
     name='network'
     items={renderedEntries}
-    selectedItem={selectedEntry}
+    selectedItem={selectedEntry ?? contextMenu.item}
     onSelected={item => setSelectedEntry(item)}
     onHighlighted={item => onEntryHovered(item?.resource)}
     columns={visibleColumns(!!selectedEntry, renderedEntries)}
@@ -105,6 +118,7 @@ export const NetworkTab: React.FunctionComponent<{
     render={(item, column) => renderCell(item, column)}
     sorting={sorting}
     setSorting={setSorting}
+    onContextMenu={contextMenu.open}
   />;
   return <>
     <NetworkFilters filterState={filterState} onFilterStateChange={onFilterStateChange} />
@@ -118,6 +132,11 @@ export const NetworkTab: React.FunctionComponent<{
         main={<NetworkResourceDetails resource={selectedEntry.resource} onClose={() => setSelectedEntry(undefined)} />}
         sidebar={grid}
       />}
+    {contextMenu.isOpened &&
+      <ContextMenu position={contextMenu.position}>
+        <ContextMenuItem onClick={onCopyUrl(contextMenu.item)}>Copy URL</ContextMenuItem>
+        <ContextMenuItem onClick={onCopyAsCurl(contextMenu.item)}>Copy as cURL</ContextMenuItem>
+      </ContextMenu>}
   </>;
 };
 
@@ -214,7 +233,7 @@ class ContextIdMap {
   private _lastPageId = 0;
   private _lastApiRequestContextId = 0;
 
-  constructor(model: MultiTraceModel | undefined) {}
+  constructor(model: MultiTraceModel | undefined) { }
 
   contextId(resource: Entry): string {
     if (resource.pageref)

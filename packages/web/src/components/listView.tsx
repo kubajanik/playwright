@@ -35,6 +35,7 @@ export type ListViewProps<T> = {
   onRightArrow?: (item: T, index: number) => void,
   onHighlighted?: (item: T | undefined) => void,
   onIconClicked?: (item: T, index: number) => void,
+  onContextMenu?: (item: T, e: React.MouseEvent) => void,
   noItemsMessage?: string,
   dataTestId?: string,
   notSelectable?: boolean,
@@ -60,6 +61,7 @@ export function ListView<T>({
   onHighlighted,
   onIconClicked,
   noItemsMessage,
+  onContextMenu,
   dataTestId,
   notSelectable,
 }: ListViewProps<T>) {
@@ -151,6 +153,7 @@ export function ListView<T>({
           onClick={() => onSelected?.(item, index)}
           onMouseEnter={() => setHighlightedItem(item)}
           onMouseLeave={() => setHighlightedItem(undefined)}
+          onContextMenu={e => onContextMenu?.(item, e)}
         >
           {indentation ? new Array(indentation).fill(0).map(() => <div className='list-view-indent'></div>) : undefined}
           {icon && <div

@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+import type { Page } from './stable-test-runner';
 import { expect, test } from './ui-mode-fixtures';
+import { exec } from 'child_process';
 
-test('should filter network requests by resource type', async ({ runUITest, server }) => {
+test('should filter network requests by resource type', async ({ runUITest, server, runCLICommand, childProcess }) => {
   server.setRoute('/api/endpoint', (_, res) => res.setHeader('Content-Type', 'application/json').end());
 
   const { page } = await runUITest({
@@ -93,3 +95,50 @@ test('should filter network requests by url', async ({ runUITest, server }) => {
   await expect(networkItems).toHaveCount(1);
   await expect(networkItems.getByText('font.woff2')).toBeVisible();
 });
+
+test('should copy network requests as cURL', async ({  runUITest, server }) => {
+  server.setRoute('/api/endpoint', (_, res) => res.setHeader('Content-Type', 'application/json').end('{"ok": true}'));
+  server.setRoute('/post-call', async (req, res) => {
+    const body = await req.postBody.then(body => body.toString());
+    res.setHeader('Content-Type', 'application/json').end(body);
+  });
+
+  const { page } = await runUITest({
+    'network-tab.test.ts': `
+      import { test, expect } from '@playwright/test';
+
+      test('network tab test', async ({ page }) => {
+        await page.goto('${server.PREFIX}/network-tab/network.html');
+      });
+    `,
+  });
+
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+  await page.getByText('network tab test').dblclick();
+  await page.getByText('Network', { exact: true }).click();
+
+  const networkItems = page.getByTestId('network-list').getByRole('listitem');
+
+  await networkItems.getByText('endpoint', { exact: true }).click({ button: 'right' });
+  await page.getByText('Copy as cURL').click();
+  exec(await getCopiedText(page), (_, result) => expect(result).toBe('{"ok": true}'));
+
+  await networkItems.getByText('post-call').click({ button: 'right' });
+  await page.getByText('Copy as cURL').click();
+  exec(await getCopiedText(page), (_, result) => expect(result).toBe('{"body":{"key":"value"}}'));
+
+  await networkItems.getByText('style.css').click({ button: 'right' });
+  await page.getByText('Copy as cURL').click();
+  console.log(process.platform);
+  exec(await getCopiedText(page), (_, result) => expect(result).toBe('.network-tab { background-color: white; }'));
+
+  await networkItems.getByText('image.png').click({ button: 'right' });
+  await page.getByText('Copy as cURL').click();
+  // assertCurlResult(await getCopiedText(page), 'xx');
+});
+
+function getCopiedText(page: Page): Promise<string> {
+  return page.evaluate(() => navigator.clipboard.readText());
+}
+

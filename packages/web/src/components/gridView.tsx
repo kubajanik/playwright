@@ -119,6 +119,7 @@ export function GridView<T>(model: GridViewProps<T>) {
         onRightArrow={model.onRightArrow}
         onHighlighted={model.onHighlighted}
         onIconClicked={model.onIconClicked}
+        onContextMenu={model.onContextMenu}
         noItemsMessage={model.noItemsMessage}
         dataTestId={model.dataTestId}
         notSelectable={model.notSelectable}

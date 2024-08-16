@@ -99,6 +99,10 @@ class TraceViewerPage {
     await this.page.click('text="Metadata"');
   }
 
+  async getCopiedText(): Promise<string> {
+    return this.page.evaluate('navigator.clipboard.readText()');
+  }
+
   @step
   async snapshotFrame(actionName: string, ordinal: number = 0, hasSubframe: boolean = false): Promise<FrameLocator> {
     await this.selectAction(actionName, ordinal);

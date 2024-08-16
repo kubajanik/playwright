@@ -20,7 +20,9 @@ import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import { expect, playwrightTest } from '../config/browserTest';
-import type { FrameLocator } from '@playwright/test';
+import type { FrameLocator, Page } from '@playwright/test';
+import { exec } from 'child_process';
+
 
 const test = playwrightTest.extend<TraceViewerFixtures>(traceViewerFixtures);
 
@@ -316,6 +318,58 @@ test('should filter network requests by url', async ({ page, runAndTrace, server
   await expect(traceViewer.networkRequests).toHaveCount(1);
   await expect(traceViewer.networkRequests.getByText('font.woff2')).toBeVisible();
 });
+
+test('should copy network requests as cURL', async ({ page, runAndTrace, server }) => {
+  const traceViewer = await runAndTrace(async () => {
+    server.setRoute('/api/endpoint', (_, res) => res.setHeader('Content-Type', 'application/json').end('{"ok": true}'));
+    server.setRoute('/post-call', async (req, res) => {
+      const response = await req.postBody.then(body => body.toString());
+      res.setHeader('Content-Type', 'application/json').end(response);
+    });
+
+    await page.goto(`${server.PREFIX}/network-tab/network.html`);
+  });
+  await traceViewer.selectAction('http://localhost');
+  await traceViewer.showNetworkTab();
+
+  await traceViewer.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+  await traceViewer.networkRequests.getByText('endpoint', { exact: true }).click({ button: 'right' });
+  await traceViewer.page.getByText('Copy as cURL').click();
+
+  exec(await traceViewer.getCopiedText(), (_, result) => {
+    expect(result).toBe('{"ok": true}');
+  });
+  // assertCurlCommandResult(await getCopiedText(traceViewer.page), '{"ok": true}');
+
+  // await traceViewer.networkRequests.getByText('post-call').click({ button: 'right' });
+  // await traceViewer.page.getByText('Copy as cURL').click();
+  // assertCurlCommandResult(await getCopiedText(traceViewer.page), '{"body":{"key":"value"}}');
+
+  // await traceViewer.networkRequests.getByText('style.css').click({ button: 'right' });
+  // await traceViewer.page.getByText('Copy as cURL').click();
+  // assertCurlCommandResult(await getCopiedText(traceViewer.page), '.network-tab { display: flex; background-color: white; }');
+
+  // await traceViewer.networkRequests.getByText('image.png').click({ button: 'right' });
+  // await traceViewer.page.getByText('Copy as cURL').click();
+  // assertCurlCommandResult(await getCopiedText(traceViewer.page), '');
+});
+
+
+
+function assertCurlCommandResult(curlCommand: string, expectedResponse: string) {
+  try {
+    const x = execSync(curlCommand + '\n');
+    console.log(x.toString())
+  } catch (error) {
+    console.log(error)
+  }
+  // exec(curlCommand, (err, response) => {
+  //   console.log(response);
+  //   expect(err).toBeNull();
+  //   expect(response).toBe(expectedResponse);
+  // });
+}
 
 test('should have network request overrides', async ({ page, server, runAndTrace }) => {
   const traceViewer = await runAndTrace(async () => {
